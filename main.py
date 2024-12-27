@@ -76,3 +76,5 @@ class Tokenizer:
 # 1, 2, 3,4 , 5, 6, 7 ... , 1000 -> vocab size
 # mouse is 12
 # access 12 and 12 has the vector representation of mouse
+
+# cosine distance -> similarity between two vectors
