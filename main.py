@@ -43,9 +43,17 @@ class Tokenizer:
         
         return vocab
     
+    
+    # encode: string to integer
+    # decode: integer to string
+    
+    # initialize the instance of a class
+    # vocab is a dictionary
     def __init__(self, vocab):
         
+        # vocab.items returns a list of the dictionaty's key-value pairs
         self.vocab_encode = {str(k): int(v) for k, v in vocab.items()}
         
         # Reverse the vocab
-        self.vocab_decode = {v: k}
+        # each value v becomes a key and each key k becomes a value
+        self.vocab_decode = {v: k for k, v in self.vocab_encode.items()}
