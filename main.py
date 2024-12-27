@@ -18,9 +18,20 @@ class Tokenizer:
     @staticmethod
     
     def create_vocab(dataset):
+        
+        
+        """
+        Create a vocab from a dataset
+
+        Args:
+        dataset (txt)
+        
+        Output:
+        Dict[str, int]
+        """
+        
         vocab = {
-            token: index
-            for index, token in enumerate(list(set(dataset)))
+            token: index for index, token in enumerate(sorted(list(set(dataset))))
         }
         
         # Adding unknown token
