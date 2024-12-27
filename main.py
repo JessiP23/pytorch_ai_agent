@@ -57,3 +57,13 @@ class Tokenizer:
         # Reverse the vocab
         # each value v becomes a key and each key k becomes a value
         self.vocab_decode = {v: k for k, v in self.vocab_encode.items()}
+        
+    def encode(self, text):
+        # arguments: text to be encoded
+        # returns: list of token indices
+        return [self.vocab_encode.get(char, self.vocab_encode["<UNK>"]) for char in text]
+    
+    def decode(self, indices):
+        # arguments: list of token indices
+        # returns: text
+        return "".join([self.vocab_decode.get(index, "<UNK>") for index in indices])
