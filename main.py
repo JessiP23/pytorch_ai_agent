@@ -78,3 +78,5 @@ class Tokenizer:
 # access 12 and 12 has the vector representation of mouse
 
 # cosine distance -> similarity between two vectors
+
+# softmax function: converts a vector of real numbers to a probability distribution
