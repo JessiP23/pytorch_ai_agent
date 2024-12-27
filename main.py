@@ -69,5 +69,6 @@ class Tokenizer:
         return "".join([self.vocab_decode.get(index, "<UNK>") for index in indices])
     
 
+# Add meaning to static numbers
 # Embeddings: Sense to numerical values
 # Embedding Layer: Converts token indices to dense vectors of fixed size
