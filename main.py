@@ -30,7 +30,11 @@ class Tokenizer:
         Dict[str, int]
         """
         
+        # enumerate returns index and token
+        # example : ['apple', 'banana', 'apple'] -> { 0: 'apple', 1 : 'banana'}
         vocab = {
+            
+            # token: index for index is a dictionary comprehension
             token: index for index, token in enumerate(sorted(list(set(dataset))))
         }
         
@@ -38,3 +42,10 @@ class Tokenizer:
         vocab["<UNK>"] = len(vocab)
         
         return vocab
+    
+    def __init__(self, vocab):
+        
+        self.vocab_encode = {str(k): int(v) for k, v in vocab.items()}
+        
+        # Reverse the vocab
+        self.vocab_decode = {v: k}
