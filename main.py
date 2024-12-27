@@ -180,3 +180,15 @@ class AttentionBlock(nn.Module):
 
 # the vector representation of each token must be different if we change the order of the tokens
 # Positional Encoding: Encode each token position with a fixed value for each position.
+
+class MultiAttentionBlock(nn.Module):
+    
+    def __init__(self, embedding_dim, num_heads, context_size):
+        """
+
+        Args:
+            embedding_dim (init): Dimensions of the embedding
+            num_heads (int): Number of attention Heads
+            context_size (int): Size of the context window.
+        """
+        super().__init__()
