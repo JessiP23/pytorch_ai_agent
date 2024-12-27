@@ -95,6 +95,10 @@ context = len(tokens)
 
 
 #layers
+
+# positional encoding
+pe = nn.Embedding(num_embeddings=context, embedding_dim=emb_dim)
+
 embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim)
 
 query = nn.Linear(in_features=emb_dim, out_features=emb_dim, bias=False)
@@ -105,10 +109,16 @@ value = nn.Linear(in_features=emb_dim, out_features=emb_dim, bias=False)
 ones = torch.ones(size=[context, context], dtype=torch.float)
 mask = torch.tril(input=ones)
 
+# introducing indices
+indices = torch.arange(context, dtype=torch.long)
+
 # forward pass
 # [9] -> [1, 9]
 t_tokens = torch.tensor(data=tokens).unsqueeze(dim=0)
 x = embedding(t_tokens)
+
+# [1, 9, 50] + [1, 9, 50] -> [1, 9, 50]
+x = pe(indices) + x
 
 B, T, C = x.size()
 Q = query(x)
@@ -128,3 +138,8 @@ out = attention @ V
 
 # data representation
 print(out.size())
+
+
+
+# the vector representation of each token must be different if we change the order of the tokens
+# Positional Encoding: Encode each token position with a fixed value for each position.
