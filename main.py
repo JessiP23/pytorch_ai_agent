@@ -252,9 +252,32 @@ class DecoderLayer(nn.Module):
         Initialize the Decoder Layer
 
         Args:
-            embedding_dim (_type_): _description_
-            head_dim (_type_): _description_
-            context_size (_type_): _description_
-            hidden_dim (_type_): _description_
+            embedding_dim (int): Word embedding dimension
+            head_dim (int): Head dimension
+            context_size (int): Size of the context window
+            hidden_dim (int): Feed Forward hidden dimension layer
         """
         super().__init__()
+        
+        self.attention = MultiAttentionBlock(embedding_dim, head_dim, context_size)
+        self.feed_forward = FeedForward(embedding_dim, hidden_dim)
+        self.norm_1 = nn.LayerNorm(normalized_shape=embedding_dim)
+        self.norm_2 = nn.LayerNorm(normalized_shape=embedding_dim)
+    
+    def forward(self, x):
+        """
+        Forward pass of teh decoder layer
+
+        Args:
+            x (torch.Tensor): input tensor
+        """
+        
+        x_norm = self.norm_1(x)
+        attention = self.attention(x_norm)
+        attention = attention + x
+        
+        attention_norm = self.norm_2(attention)
+        feed_forward = self.feed_forward(attention_norm)
+        feed_forward = feed_forward + attention
+        
+        return feed_forward
