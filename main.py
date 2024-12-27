@@ -67,3 +67,7 @@ class Tokenizer:
         # arguments: list of token indices
         # returns: text
         return "".join([self.vocab_decode.get(index, "<UNK>") for index in indices])
+    
+
+# Embeddings: Sense to numerical values
+# Embedding Layer: Converts token indices to dense vectors of fixed size
