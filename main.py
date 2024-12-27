@@ -80,3 +80,51 @@ class Tokenizer:
 # cosine distance -> similarity between two vectors
 
 # softmax function: converts a vector of real numbers to a probability distribution
+
+torch.random.manual_seed(seed=1234)
+
+# data
+text = "Hi!, My name is Jessi."
+tokens = [13347, 0, 3092, 836, 374, 7011, 383, 355, 13]
+
+#parameters
+# zero index
+vocab_size = max(tokens) + 1
+emb_dim = 5
+context = len(tokens)
+
+
+#layers
+embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim)
+
+query = nn.Linear(in_features=emb_dim, out_features=emb_dim, bias=False)
+key = nn.Linear(in_features=emb_dim, out_features=emb_dim, bias=False)
+value = nn.Linear(in_features=emb_dim, out_features=emb_dim, bias=False)
+
+# mask filter
+ones = torch.ones(size=[context, context], dtype=torch.float)
+mask = torch.tril(input=ones)
+
+# forward pass
+# [9] -> [1, 9]
+t_tokens = torch.tensor(data=tokens).unsqueeze(dim=0)
+x = embedding(t_tokens)
+
+B, T, C = x.size()
+Q = query(x)
+K = key(x)
+V = value(x)
+
+QK = Q @ K.transpose(-2, -1) * C**-0.5
+
+# applying mask
+attention = QK.masked_fill(mask[:T, :T] == 0, float('-inf'))
+
+# [1,9,9] normalizing to 0 and 1 in embedding dimension
+attention = F.softmax(input=attention, dim = -1)
+
+# [1,9,9] @ [1, 9, 50] -> [1, 9, 50]
+out = attention @ V
+
+# data representation
+print(out.size())
