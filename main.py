@@ -81,64 +81,101 @@ class Tokenizer:
 
 # softmax function: converts a vector of real numbers to a probability distribution
 
-torch.random.manual_seed(seed=1234)
+# torch.random.manual_seed(seed=1234)
 
 # data
-text = "Hi!, My name is Jessi."
-tokens = [13347, 0, 3092, 836, 374, 7011, 383, 355, 13]
+# text = "Hi!, My name is Jessi."
+# tokens = [13347, 0, 3092, 836, 374, 7011, 383, 355, 13]
 
 #parameters
 # zero index
-vocab_size = max(tokens) + 1
-emb_dim = 5
-context = len(tokens)
+# vocab_size = max(tokens) + 1
+# emb_dim = 5
+# context = len(tokens)
 
 
 #layers
 
 # positional encoding
-pe = nn.Embedding(num_embeddings=context, embedding_dim=emb_dim)
+# pe = nn.Embedding(num_embeddings=context, embedding_dim=emb_dim)
 
-embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim)
+# embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim)
 
-query = nn.Linear(in_features=emb_dim, out_features=emb_dim, bias=False)
-key = nn.Linear(in_features=emb_dim, out_features=emb_dim, bias=False)
-value = nn.Linear(in_features=emb_dim, out_features=emb_dim, bias=False)
+# query = nn.Linear(in_features=emb_dim, out_features=emb_dim, bias=False)
+# key = nn.Linear(in_features=emb_dim, out_features=emb_dim, bias=False)
+# value = nn.Linear(in_features=emb_dim, out_features=emb_dim, bias=False)
 
 # mask filter
-ones = torch.ones(size=[context, context], dtype=torch.float)
-mask = torch.tril(input=ones)
+# ones = torch.ones(size=[context, context], dtype=torch.float)
+# mask = torch.tril(input=ones)
 
 # introducing indices
-indices = torch.arange(context, dtype=torch.long)
+# indices = torch.arange(context, dtype=torch.long)
 
 # forward pass
 # [9] -> [1, 9]
-t_tokens = torch.tensor(data=tokens).unsqueeze(dim=0)
-x = embedding(t_tokens)
+# t_tokens = torch.tensor(data=tokens).unsqueeze(dim=0)
+# x = embedding(t_tokens)
 
 # [1, 9, 50] + [1, 9, 50] -> [1, 9, 50]
-x = pe(indices) + x
+# x = pe(indices) + x
 
-B, T, C = x.size()
-Q = query(x)
-K = key(x)
-V = value(x)
+# B, T, C = x.size()
+# Q = query(x)
+# K = key(x)
+# V = value(x)
 
-QK = Q @ K.transpose(-2, -1) * C**-0.5
+# QK = Q @ K.transpose(-2, -1) * C**-0.5
 
 # applying mask
-attention = QK.masked_fill(mask[:T, :T] == 0, float('-inf'))
+# attention = QK.masked_fill(mask[:T, :T] == 0, float('-inf'))
 
 # [1,9,9] normalizing to 0 and 1 in embedding dimension
-attention = F.softmax(input=attention, dim = -1)
+# attention = F.softmax(input=attention, dim = -1)
 
 # [1,9,9] @ [1, 9, 50] -> [1, 9, 50]
-out = attention @ V
+# out = attention @ V
 
 # data representation
-print(out.size())
+# print(out.size())
 
+class Embedding(nn.Module):
+    def __init__(self, vocab_size, embedding_dim):
+        super().__init__()
+        self.embedding = nn.Embedding(vocab_size, embedding_dim)
+        self.pe = nn.Embedding(vocab_size, embedding_dim)
+    
+    def forward(self, x):
+        word_emb = self.embedding(x)
+        word_pe = self.pe(x)
+        return word_emb + word_pe
+
+class AttentionBlock(nn.Module):
+    
+    def __init__(self, embedding_dim, context_size):
+        super().__init__()
+        self.query = nn.Linear(embedding_dim, embedding_dim, bias=False)
+        self.key = nn.Linear(embedding_dim, embedding_dim, bias=False)
+        self.value = nn.Linear(embedding_dim, embedding_dim, bias=False)
+        
+        ones = torch.ones(size=[context_size, context_size], dtype=torch.float)
+        
+        # Triangular matrix
+        self.register_buffer(name="mask", tensor=torch.tril(input=ones))
+        
+    def forward(self, x):
+        B, T, C = x.size()
+        
+        query = self.query(x)
+        key = self.key(x)
+        value = self.value(x)
+        
+        qk = query @ key.transpose(-2, -1) * C**-0.5
+        attention = qk.masked_fill(self.mask[:T, :T] == 0, float('-inf'))
+        attention = F.softmax(attention, dim=-1)
+        
+        out = attention @ value
+        return out
 
 
 # the vector representation of each token must be different if we change the order of the tokens
