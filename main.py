@@ -8,3 +8,7 @@ import torch.nn.functional as F
 # @ stands for matrix multiplication
 
 # tokenization - TikToken by OpenAI or SentencePiece by Google
+
+# SentencePiece mainly for Neural Network-based text generation systems where teh vocab is determined prior to neural model training.
+
+# Tiktoken is used with OpenAI's models
