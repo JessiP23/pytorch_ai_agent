@@ -12,3 +12,18 @@ import torch.nn.functional as F
 # SentencePiece mainly for Neural Network-based text generation systems where teh vocab is determined prior to neural model training.
 
 # Tiktoken is used with OpenAI's models
+
+class Tokenizer:
+    
+    @staticmethod
+    
+    def create_vocab(dataset):
+        vocab = {
+            token: index
+            for index, token in enumerate(list(set(dataset)))
+        }
+        
+        # Adding unknown token
+        vocab["<UNK>"] = len(vocab)
+        
+        return vocab
