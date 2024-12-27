@@ -192,3 +192,69 @@ class MultiAttentionBlock(nn.Module):
             context_size (int): Size of the context window.
         """
         super().__init__()
+        
+        # Determine the number of heads
+        head_dimension = embedding_dim // num_heads
+        
+        assert head_dimension * num_heads == embedding_dim, "Embedding dimension must be divisible by the number of heads."
+        
+        self.attention = nn.ModuleList(modules=[AttentionBlock(embedding_dim, head_dimension, context_size) for _ in range(num_heads)])
+        self.linear = nn.Linear(in_features=embedding_dim, out_features=embedding_dim)
+        
+    def forward(self, x):
+        """
+        MultipAttentionBlock forward pass layer
+
+        Args:
+            x (torch.Tensor): Input tensor
+            
+        Returns:
+        torch.Tensor
+        """
+        
+        out = torch.cat(tensors=[attention(x) for attention in self.attention], dim = -1)
+        
+        x = self.linear(out)
+        
+        return x
+
+# Apply skip-connect after the Multi-Head-Attention block to avoid vanishing gradients
+# Apply a Batch normalization and feed a Fully-Connected-Neurons to process the useful information extracted from previous block
+# Feed teh previous block to another Attention block
+
+
+class FeedForward(nn.Module):
+    def __init__(self, embedding_dim, hidden_dim):
+        super().__init__()
+        
+        self.linear_1 = nn.Linear(embedding_dim, hidden_dim)
+        self.relu = nn.ReLU()
+        self.linear_2 = nn.Linear(hidden_dim, embedding_dim)
+        
+    def forward(self, x):
+        """
+        Foward pass of the feed Forward Layer
+
+        Args:
+            x (torch.Tensor): Input tensor
+        returns:
+            torch.Tensor: output tensor
+        """
+        
+        x = self.linear_1(x)
+        x = self.relu(x)
+        x = self.linear_2(x)
+        return x
+    
+class DecoderLayer(nn.Module):
+    def __init__(self, embedding_dim, head_dim, context_size, hidden_dim):
+        """
+        Initialize the Decoder Layer
+
+        Args:
+            embedding_dim (_type_): _description_
+            head_dim (_type_): _description_
+            context_size (_type_): _description_
+            hidden_dim (_type_): _description_
+        """
+        super().__init__()
