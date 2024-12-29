@@ -234,7 +234,7 @@ def main():
                 print(f"Genre: {recommendation['genre']}")
                 print(f"Sub-Genre: {recommendation['sub_genre']}")
                 print(f"Mood: {recommendation['mood']}")
-                print(f"Location: {recommendation['location']}")
+                print(f"Location: {recommendation['country']}")
                 print(f"Perplexity: {recommendation['perplexity']:.2f}\n")
             else:
                 print("No recommendation could be made at this time.\n")
