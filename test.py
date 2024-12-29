@@ -108,14 +108,16 @@ def generate_recommendation(description, model, tokenizer, device, songs_df, thr
     recommended_text = tokenizer.decode(predicted_id[0], skip_special_tokens=True)
     logger.info(f"Recommended Text: '{recommended_text}'")
     
-    # Extract song name using regex
-    match = re.search(r"Recommend a similar song:\s*(.*)", recommended_text, re.IGNORECASE)
-    if match:
-        recommended_song_name = clean_text(match.group(1))
-        logger.info(f"Extracted recommended song name: '{recommended_song_name}'")
+    # Extract song name and artist using ' by ' separator
+    parts = recommended_text.split(' by ')
+    if len(parts) >= 2:
+        recommended_song_name = clean_text(parts[0])
+        recommended_artist_name = clean_text(parts[1])
+        logger.info(f"Extracted recommended song name: '{recommended_song_name}' and artist name: '{recommended_artist_name}'")
     else:
         recommended_song_name = ""
-        logger.warning("Could not extract recommended song name from the model's output.")
+        recommended_artist_name = ""
+        logger.warning("Could not extract recommended song name and artist name from the model's output.")
     
     # Initialize recommendation dictionary
     recommendation = {
@@ -124,7 +126,11 @@ def generate_recommendation(description, model, tokenizer, device, songs_df, thr
         "genre": "",
         "sub_genre": "",
         "mood": "",
-        "location": "",
+        "country": "",
+        "city": "",
+        "spotify_url": "",
+        "apple_url": "",
+        "instagram_url": "",
         "perplexity": perplexity
     }
     
@@ -138,6 +144,7 @@ def generate_recommendation(description, model, tokenizer, device, songs_df, thr
         )
         
         if score >= threshold:
+            # Retrieve the song data
             recommended_song = songs_df[songs_df['song_name_clean'] == best_match].iloc[0]
             recommendation.update({
                 "song_name": recommended_song['song_name'],
@@ -145,7 +152,11 @@ def generate_recommendation(description, model, tokenizer, device, songs_df, thr
                 "genre": recommended_song.get('genre', ''),
                 "sub_genre": recommended_song.get('sub_genre', ''),
                 "mood": recommended_song.get('mood', ''),
-                "location": recommended_song.get('location', ''),
+                "country": recommended_song.get('country', ''),
+                "city": recommended_song.get('city', ''),
+                "spotify_url": recommended_song.get('spotify_url', ''),
+                "apple_url": recommended_song.get('apple_url', ''),
+                "instagram_url": recommended_song.get('instagram_url', ''),
                 "perplexity": perplexity
             })
             logger.info(f"Found recommended song: '{recommended_song['song_name']}' by '{recommended_song['artist_name']}' with score {score}")
@@ -163,7 +174,11 @@ def generate_recommendation(description, model, tokenizer, device, songs_df, thr
             "genre": random_song.get('genre', ''),
             "sub_genre": random_song.get('sub_genre', ''),
             "mood": random_song.get('mood', ''),
-            "location": random_song.get('location', ''),
+            "country": random_song.get('country', ''),
+            "city": random_song.get('city', ''),
+            "spotify_url": random_song.get('spotify_url', ''),
+            "apple_url": random_song.get('apple_url', ''),
+            "instagram_url": random_song.get('instagram_url', ''),
             "perplexity": perplexity
         })
         logger.info(f"Fallback recommendation: '{random_song['song_name']}' by '{random_song['artist_name']}'")
@@ -234,7 +249,11 @@ def main():
                 print(f"Genre: {recommendation['genre']}")
                 print(f"Sub-Genre: {recommendation['sub_genre']}")
                 print(f"Mood: {recommendation['mood']}")
-                print(f"Location: {recommendation['country']}")
+                print(f"Country: {recommendation['country']}")
+                print(f"City: {recommendation['city']}")
+                print(f"Spotify: {recommendation['spotify_url']}")
+                print(f"Apple: {recommendation['apple_url']}")
+                print(f"Instagram: {recommendation['instagram_url']}")
                 print(f"Perplexity: {recommendation['perplexity']:.2f}\n")
             else:
                 print("No recommendation could be made at this time.\n")
