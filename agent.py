@@ -1,380 +1,536 @@
-import os
+# ----------------------------- #
+#          Imports               #
+# ----------------------------- #
+
+import sys  # Added import for stream handling
 import json
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from transformers import GPT2LMHeadModel, GPT2Tokenizer, get_linear_schedule_with_warmup
-import firebase_admin
-from firebase_admin import credentials, firestore
+from transformers import GPT2Tokenizer, GPT2LMHeadModel
+from torch.optim import AdamW  # Changed import to PyTorch's AdamW
+from transformers import get_linear_schedule_with_warmup
+import pandas as pd
+import logging
+from sklearn.model_selection import train_test_split
+from torch.utils.data import Dataset, DataLoader
+import re
+import math
+import os
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import List
 import uvicorn
-import pandas as pd
-from sklearn.model_selection import train_test_split
-import logging
-import math
-import nest_asyncio  # To handle asyncio issues in certain environments
+from typing import Optional
+import asyncio
+import warnings
+from fuzzywuzzy import process, fuzz  # Added imports for fuzzy matching
+from contextlib import asynccontextmanager  # Added for FastAPI lifespan
+from tqdm import tqdm  # Added import for progress bars
 
 # ----------------------------- #
 #       Configuration Setup      #
 # ----------------------------- #
 
+# Suppress specific FutureWarnings from PyTorch
+warnings.filterwarnings("ignore", category=FutureWarning, module="torch")
+
 # Initialize Logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)  # Ensures logs are output to stdout in Colab
+    ]
+)
 logger = logging.getLogger(__name__)
 
 # ----------------------------- #
-#       Transformer Model        #
+#        Utility Functions       #
+# ----------------------------- #
+
+def clean_text(text):
+    """Normalize and clean text for consistency."""
+    if not isinstance(text, str):
+        text = str(text)
+    # Remove text within parentheses and brackets
+    text = re.sub(r'\(.*?\)|\[.*?\]', '', text)
+    return re.sub(r'[^\w\s]', '', text).strip().lower()
+
+def calculate_perplexity(loss):
+    """Calculate perplexity from loss."""
+    try:
+        return math.exp(loss)
+    except OverflowError:
+        logger.error("Overflow error encountered while calculating perplexity.")
+        return float('inf')
+
+def make_clickable(url):
+    """Format URLs as clickable links."""
+    return f"<{url}>" if url else ""
+
+# ----------------------------- #
+#          Dataset Class         #
+# ----------------------------- #
+
+class SongDataset(Dataset):
+    def __init__(self, descriptions, targets, tokenizer, max_length=128):
+        self.descriptions = descriptions
+        self.targets = targets
+        self.tokenizer = tokenizer
+        self.max_length = max_length
+
+    def __len__(self):
+        return len(self.descriptions)
+
+    def __getitem__(self, idx):
+        description = str(self.descriptions[idx])
+        target = str(self.targets[idx])
+
+        # Encode description
+        encoding = self.tokenizer.encode_plus(
+            description,
+            add_special_tokens=True,
+            max_length=self.max_length,
+            padding='max_length',
+            truncation=True,
+            return_attention_mask=True,
+            return_tensors='pt',
+        )
+
+        # Encode target
+        target_encoding = self.tokenizer.encode_plus(
+            target,
+            add_special_tokens=True,
+            max_length=self.max_length,
+            padding='max_length',
+            truncation=True,
+            return_attention_mask=True,
+            return_tensors='pt',
+        )
+
+        return {
+            'input_ids': encoding['input_ids'].squeeze(),  # Changed from flatten() to squeeze()
+            'attention_mask': encoding['attention_mask'].squeeze(),
+            'labels': target_encoding['input_ids'].squeeze()
+        }
+
+# ----------------------------- #
+#          Model Class           #
 # ----------------------------- #
 
 class MusicRecommendationModel(nn.Module):
     def __init__(self, pretrained_model_name='gpt2', dropout=0.3):
         super(MusicRecommendationModel, self).__init__()
-        self.gpt2 = GPT2LMHeadModel.from_pretrained(pretrained_model_name)
-        self.gpt2.resize_token_embeddings(len(GPT2Tokenizer.from_pretrained(pretrained_model_name)))
+        self.model = GPT2LMHeadModel.from_pretrained(pretrained_model_name)
         self.dropout = nn.Dropout(dropout)
-        
-    def forward(self, input_ids, attention_mask=None, labels=None):
-        outputs = self.gpt2(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
-        loss = outputs.loss
-        logits = outputs.logits
-        return loss, logits
-
-# ----------------------------- #
-#        Data Processing         #
-# ----------------------------- #
-
-def fetch_data(file_path):
-    logger.info(f"Loading data from {file_path}...")
-    with open(file_path, 'r', encoding='utf-8') as f:
-        songs = json.load(f)
-    songs_df = pd.DataFrame(songs)
-    if 'id' in songs_df.columns:
-        songs_df.rename(columns={'id': 'song_id'}, inplace=True)
-    logger.info("Data loaded successfully.")
-    return songs_df
-
-def clean_data(songs_df):
-    logger.info("Cleaning data...")
-    songs_df.dropna(subset=['song_name', 'artist_name'], inplace=True)
-    songs_df['genre'] = songs_df['genre'].str.lower()
-    songs_df['sub_genre'] = songs_df['sub_genre'].str.lower().fillna('')
-    songs_df['mood'] = songs_df['mood'].str.lower().fillna('')
-    if 'state' in songs_df.columns:
-        songs_df['location'] = songs_df['city'].fillna('') + ', ' + songs_df['state'].fillna('')
-    elif 'country' in songs_df.columns:
-        songs_df['location'] = songs_df['city'].fillna('') + ', ' + songs_df['country'].fillna('')
-    else:
-        songs_df['location'] = songs_df['city'].fillna('')
-    logger.info("Data cleaned.")
-    return songs_df
-
-def preprocess_data(songs_df):
-    logger.info("Preprocessing data...")
-    songs_df['text'] = songs_df.apply(
-        lambda row: f"Song '{row['song_name']}' by {row['artist_name']}' is a {row['genre']} song with a {row['mood']} mood. Sub-genre: {row['sub_genre']}. Located in {row['location']}. Recommend a similar song:",
-        axis=1
-    )
+        # Fixed the error: Removed len() since vocab_size is already an integer
+        self.model.resize_token_embeddings(self.model.config.vocab_size)
     
-    train_texts, val_texts = train_test_split(
-        songs_df['text'].tolist(),
-        test_size=0.1,
-        random_state=42
-    )
-    logger.info("Data preprocessing complete.")
-    return train_texts, val_texts
-
-# ----------------------------- #
-#        Dataset Class           #
-# ----------------------------- #
-
-class MusicDataset(torch.utils.data.Dataset):
-    def __init__(self, texts, tokenizer, max_length=128):
-        logger.info("Initializing MusicDataset...")
-        self.texts = texts
-        self.tokenizer = tokenizer
-        self.max_length = max_length
-        
-    def __len__(self):
-        return len(self.texts)
-    
-    def __getitem__(self, idx):
-        encoding = self.tokenizer.encode_plus(
-            self.texts[idx],
-            add_special_tokens=True,
-            max_length=self.max_length,
-            padding='max_length',
-            truncation=True,
-            return_tensors='pt'
+    def forward(self, input_ids, attention_mask, labels=None):
+        outputs = self.model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            labels=labels
         )
-        input_ids = encoding['input_ids'].squeeze()  # shape: (max_length)
-        attention_mask = encoding['attention_mask'].squeeze()  # shape: (max_length)
+        return outputs.loss, outputs.logits
+
+# ----------------------------- #
+#          Training Function     #
+# ----------------------------- #
+
+def train_epoch(model, data_loader, optimizer, scheduler, device, epoch, scaler):
+    model.train()
+    total_loss = 0
+    progress_bar = tqdm(data_loader, desc=f"Training Epoch {epoch}", leave=True)
+    for batch in progress_bar:
+        input_ids = batch["input_ids"].to(device)
+        attention_mask = batch["attention_mask"].to(device)
+        labels = batch["labels"].to(device)
+
+        optimizer.zero_grad()
         
+        with torch.amp.autocast(device_type='cuda'):
+            loss, _ = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+        
+        scaler.scale(loss).backward()
+
+        # Gradient clipping
+        scaler.unscale_(optimizer)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
+        scaler.step(optimizer)
+        scaler.update()
+        scheduler.step()
+
+        total_loss += loss.item()
+        progress_bar.set_postfix({"Loss": f"{loss.item():.4f}"})
+
+    avg_loss = total_loss / len(data_loader)
+    perplexity = calculate_perplexity(avg_loss)
+    logger.info(f"Epoch {epoch}: Training Loss: {avg_loss:.4f}, Perplexity: {perplexity:.2f}")
+    return avg_loss, perplexity
+
+def eval_model(model, data_loader, device, epoch, phase="Validation"):
+    model.eval()
+    total_loss = 0
+    progress_bar = tqdm(data_loader, desc=f"{phase} Epoch {epoch}", leave=True)
+    with torch.no_grad():
+        for batch in progress_bar:
+            input_ids = batch["input_ids"].to(device)
+            attention_mask = batch["attention_mask"].to(device)
+            labels = batch["labels"].to(device)
+
+            with torch.amp.autocast(device_type='cuda'):
+                loss, _ = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+            total_loss += loss.item()
+            progress_bar.set_postfix({"Loss": f"{loss.item():.4f}"})
+
+    avg_loss = total_loss / len(data_loader)
+    perplexity = calculate_perplexity(avg_loss)
+    logger.info(f"Epoch {epoch}: {phase} Loss: {avg_loss:.4f}, Perplexity: {perplexity:.2f}")
+    return avg_loss, perplexity
+
+# ----------------------------- #
+#            Inference Class     #
+# ----------------------------- #
+
+class InferenceModel:
+    def __init__(self, model_path, tokenizer_path='gpt2', device=None):
+        self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        logger.info(f"Loading model from '{model_path}' to device '{self.device}'...")
+        self.model = MusicRecommendationModel()
+        self.model.load_state_dict(torch.load(model_path, map_location=self.device))  # Set weights_only=True if applicable
+        self.model.to(self.device)
+        self.model.eval()
+
+        logger.info(f"Loading tokenizer from '{tokenizer_path}'...")
+        self.tokenizer = GPT2Tokenizer.from_pretrained(tokenizer_path)
+        self.tokenizer.pad_token = self.tokenizer.eos_token
+        logger.info("Model and tokenizer loaded successfully.")
+    
+    def generate_recommendation(self, description, songs_df, threshold=80):
+        """Generate a song recommendation based on the description."""
+        try:
+            # Clean and encode the input description
+            description_clean = clean_text(description)
+            inputs = self.tokenizer.encode_plus(
+                description_clean,
+                add_special_tokens=True,
+                max_length=128,
+                padding='max_length',
+                truncation=True,
+                return_attention_mask=True,
+                return_tensors='pt'
+            ).to(self.device)
+
+            with torch.no_grad():
+                outputs = self.model.model.generate(
+                    input_ids=inputs['input_ids'],
+                    attention_mask=inputs['attention_mask'],
+                    max_length=50,
+                    num_return_sequences=1,
+                    no_repeat_ngram_size=2,
+                    early_stopping=True
+                )
+
+            predicted_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+            logger.info(f"Model generated text: '{predicted_text}'")
+
+            # Extract song name and artist
+            parts = predicted_text.split(' by ')
+            if len(parts) >= 2:
+                song_name = clean_text(parts[0])
+                artist_name = clean_text(parts[1])
+                logger.info(f"Extracted Song: '{song_name}', Artist: '{artist_name}'")
+            else:
+                logger.warning("Incomplete extraction; proceeding to fallback recommendation.")
+                return self.fallback_recommendation(songs_df)
+
+            # Fuzzy matching for song and artist
+            song_matches = process.extract(
+                song_name,
+                songs_df['song_name_clean'],
+                scorer=fuzz.token_sort_ratio,
+                limit=5
+            )
+
+            # Iterate over song matches and find artist matches
+            for song, song_score in song_matches:
+                potential_songs = songs_df[songs_df['song_name_clean'] == song]
+                for _, row in potential_songs.iterrows():
+                    artist_score = fuzz.token_sort_ratio(artist_name, row['artist_name_clean'])
+                    if artist_score >= threshold:
+                        logger.info(f"Matched Song: '{row['song_name']}' by '{row['artist_name']}' with scores {song_score}, {artist_score}")
+                        return self.format_recommendation(row)
+
+            logger.warning("No suitable match found; proceeding to fallback recommendation.")
+            return self.fallback_recommendation(songs_df)
+
+        except Exception as e:
+            logger.error(f"Error during inference: {e}")
+            return self.fallback_recommendation(songs_df)
+
+    def fallback_recommendation(self, songs_df):
+        """Provide a random song as a fallback recommendation."""
+        random_song = songs_df.sample(1).iloc[0]
+        logger.info(f"Fallback Recommendation: '{random_song['song_name']}' by '{random_song['artist_name']}'")
+        return self.format_recommendation(random_song)
+
+    def format_recommendation(self, song):
+        """Format the song recommendation."""
         return {
-            'input_ids': input_ids,
-            'attention_mask': attention_mask,
-            'labels': input_ids.clone()
+            "song_name": song['song_name'],
+            "artist_name": song['artist_name'],
+            "genre": song.get('genre', ''),
+            "sub_genre": song.get('sub_genre', ''),
+            "mood": song.get('mood', ''),
+            "country": song.get('country', ''),
+            "city": song.get('city', ''),
+            "spotify_url": make_clickable(song.get('spotify_url', '')),
+            "apple_url": make_clickable(song.get('apple_url', '')),
+            "instagram_url": make_clickable(song.get('instagram_url', '')),
+            "perplexity": ""  # Perplexity can be calculated if needed
         }
 
 # ----------------------------- #
-#          Model Training        #
+#            FastAPI Setup       #
 # ----------------------------- #
 
-def calculate_perplexity(loss):
-    return math.exp(loss)
-
-def train_model(model, train_dataloader, val_dataloader, optimizer, scheduler, device, epochs=10, patience=3):
-    logger.info("Starting model training...")
-    best_val_loss = float('inf')
-    epochs_no_improve = 0
-    for epoch in range(epochs):
-        logger.info(f"Epoch {epoch+1}/{epochs}")
-        model.train()
-        total_loss = 0
-        for batch_idx, batch in enumerate(train_dataloader):
-            input_ids = batch['input_ids'].to(device)
-            attention_mask = batch['attention_mask'].to(device)
-            labels = batch['labels'].to(device)
-            
-            optimizer.zero_grad()
-            loss, _ = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            optimizer.step()
-            scheduler.step()
-            
-            total_loss += loss.item()
-            if (batch_idx + 1) % 10 == 0:
-                logger.info(f"  Batch {batch_idx+1}/{len(train_dataloader)}, Loss: {loss.item():.4f}")
-        avg_train_loss = total_loss / len(train_dataloader)
-        logger.info(f"Epoch {epoch+1} completed. Average Training Loss: {avg_train_loss:.4f}")
-        
-        # Validation
-        model.eval()
-        val_loss = 0
-        with torch.no_grad():
-            for batch in val_dataloader:
-                input_ids = batch['input_ids'].to(device)
-                attention_mask = batch['attention_mask'].to(device)
-                labels = batch['labels'].to(device)
-                
-                loss, _ = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
-                val_loss += loss.item()
-        avg_val_loss = val_loss / len(val_dataloader)
-        perplexity = calculate_perplexity(avg_val_loss)
-        logger.info(f"Validation Loss: {avg_val_loss:.4f}, Perplexity: {perplexity:.4f}")
-        
-        # Early Stopping Check
-        if avg_val_loss < best_val_loss:
-            best_val_loss = avg_val_loss
-            torch.save(model.state_dict(), "best_trained_music_recommender.pt")
-            logger.info("Best model saved.")
-            epochs_no_improve = 0
-        else:
-            epochs_no_improve += 1
-            logger.info(f"No improvement in validation loss for {epochs_no_improve} epochs.")
-            if epochs_no_improve >= patience:
-                logger.info("Early stopping triggered.")
-                break
-    # Save the final model
-    torch.save(model.state_dict(), "trained_music_recommender.pt")
-    logger.info("Model training complete and saved.")
-
-# ----------------------------- #
-#          Recommendation Logic #
-# ----------------------------- #
-
-def generate_recommendation(description, model, tokenizer, device, songs_df):
-    logger.info(f"Generating recommendation for: {description}")
-    encoding = tokenizer.encode_plus(
-        description,
-        add_special_tokens=True,
-        max_length=128,
-        padding='max_length',
-        truncation=True,
-        return_tensors='pt'
-    )
-    input_ids = encoding['input_ids'].to(device)
-    attention_mask = encoding['attention_mask'].to(device)
-    
-    with torch.no_grad():
-        loss, logits = model(input_ids=input_ids, attention_mask=attention_mask, labels=input_ids)
-        predicted_id = torch.argmax(logits, dim=-1)
-    
-    recommended_text = tokenizer.decode(predicted_id[0], skip_special_tokens=True)
-    logger.info(f"Recommended Text: {recommended_text}")
-    
-    try:
-        recommended_song_name = recommended_text.split("Recommend a similar song:")[-1].strip()
-        logger.info(f"Extracted recommended song name: '{recommended_song_name}'")
-    except Exception as e:
-        logger.error(f"Error extracting song name: {e}")
-        recommended_song_name = ""
-    
-    if recommended_song_name:
-        recommended_song = songs_df[songs_df['song_name'].str.lower() == recommended_song_name.lower()]
-        if not recommended_song.empty:
-            logger.info(f"Found recommended song: '{recommended_song.iloc[0]['song_name']}' by {recommended_song.iloc[0]['artist_name']}'")
-            return recommended_song.iloc[0].to_dict()
-        else:
-            logger.warning("Recommended song not found in dataset.")
-    
-    # Fallback: Return a random song if no match found
-    random_song = songs_df.sample(1).iloc[0].to_dict()
-    logger.info(f"Fallback recommendation: '{random_song['song_name']}' by {random_song['artist_name']}'")
-    return {"song_name": random_song['song_name'], "artist_name": random_song['artist_name']}
-
-def store_recommendation(db, recommendation):
-    logger.info("Storing recommendation in Firebase...")
-    recommendation_entry = {
-        'song_id': recommendation.get('song_id', ''),
-        'song_name': recommendation.get('song_name', ''),
-        'artist_name': recommendation.get('artist_name', ''),
-        'timestamp': firestore.SERVER_TIMESTAMP
-    }
-    db.collection('ai').add(recommendation_entry)
-    logger.info("Recommendation stored in Firebase.")
-
-# ----------------------------- #
-#           API Setup            #
-# ----------------------------- #
-
-app = FastAPI()
-global model, tokenizer, device, songs_df, db
+app = FastAPI(title="Music Recommendation API")
 
 class RecommendationRequest(BaseModel):
-    description: str  # Description provided by the user
+    description: str
 
-@app.post("/get-recommendation/")
-def get_recommendation(request: RecommendationRequest):
-    try:
-        description = request.description
-        logger.info(f"Received recommendation request with description: '{description}'")
-        
-        # Generate recommendation
-        recommendation = generate_recommendation(description, model, tokenizer, device, songs_df)
-        
-        if recommendation and recommendation.get('song_name'):
-            # Optionally store the recommendation
-            # store_recommendation(db, recommendation)
-            logger.info(f"Returning recommendation: '{recommendation['song_name']}' by {recommendation['artist_name']}'")
-            return {"recommended_song": f"{recommendation['song_name']} by {recommendation['artist_name']}"}
-        else:
-            logger.warning("No similar songs found.")
-            return {"recommended_song": "No similar songs found. Please try different criteria."}
+class RecommendationResponse(BaseModel):
+    description: str
+    recommended_song: str
+    artist: str
+    genre: str
+    sub_genre: str
+    mood: str
+    country: str
+    city: str
+    spotify_url: Optional[str] = None
+    apple_url: Optional[str] = None
+    instagram_url: Optional[str] = None
+    perplexity: Optional[float] = None
+
+# Initialize Inference Model
+inference_model = None
+songs_df = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global inference_model, songs_df
+    logger.info(f"Loading model from 'best_trained_music_recommender.pt'...")
+    model_path = "best_trained_music_recommender.pt"
+    tokenizer_path = "gpt2"
+    inference_model = InferenceModel(model_path, tokenizer_path)
     
-    except Exception as e:
-        logger.error(f"Error during recommendation: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    # Load the songs dataset
+    songs_path = "songs.json"
+    logger.info(f"Loading songs data from '{songs_path}' for inference...")
+    with open(songs_path, 'r', encoding='utf-8') as f:
+        songs = json.load(f)
+    songs_df = pd.DataFrame(songs)
+    # Clean song and artist names
+    songs_df['song_name_clean'] = songs_df['song_name'].apply(clean_text)
+    songs_df['artist_name_clean'] = songs_df['artist_name'].apply(clean_text)
+    logger.info(f"Loaded {len(songs_df)} songs for inference.")
+    
+    yield
+    
+    # Shutdown events (if any)
+    logger.info("Shutting down FastAPI server...")
+
+app = FastAPI(title="Music Recommendation API", lifespan=lifespan)
+
+@app.post("/recommend", response_model=RecommendationResponse)
+def recommend_song(request: RecommendationRequest):
+    if not inference_model or songs_df is None:
+        raise HTTPException(status_code=500, detail="Model is not loaded.")
+    recommendation = inference_model.generate_recommendation(request.description, songs_df)
+    return RecommendationResponse(
+        description=request.description,
+        recommended_song=recommendation["song_name"],
+        artist=recommendation["artist_name"],
+        genre=recommendation["genre"],
+        sub_genre=recommendation["sub_genre"],
+        mood=recommendation["mood"],
+        country=recommendation["country"],
+        city=recommendation["city"],
+        spotify_url=recommendation["spotify_url"],
+        apple_url=recommendation["apple_url"],
+        instagram_url=recommendation["instagram_url"],
+        perplexity=recommendation.get("perplexity")
+    )
 
 # ----------------------------- #
-#          Main Execution        #
+#            Main Function       #
 # ----------------------------- #
 
 def main():
+    """Main function to train the music recommendation model."""
     try:
-        logger.info("Starting the agent script...")
+        logger.info("Starting the training script...")
         
-        # Initialize Firebase
-        logger.info("Initializing Firebase...")
-        key_path = "./key.json"  # Update this path if necessary
-        cred = credentials.Certificate(key_path)
-        if not firebase_admin._apps:
-            firebase_admin.initialize_app(cred)
-            logger.info("Firebase initialized.")
-        else:
-            logger.info("Firebase already initialized.")
-        db = firestore.client()
+        # Device configuration
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        logger.info(f"Using device: {device}")
         
-        # Load and preprocess data
-        logger.info("Loading songs data...")
-        songs_df = fetch_data('songs.json')  # Ensure songs.json is in the correct path
-        logger.info("Cleaning songs data...")
-        songs_df = clean_data(songs_df)
-        
-        logger.info("Preprocessing songs data...")
-        train_texts, val_texts = preprocess_data(songs_df)
-        
-        # Initialize tokenizer
-        logger.info("Initializing tokenizer...")
+        # Load the tokenizer
+        logger.info("Loading tokenizer...")
         tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         tokenizer.pad_token = tokenizer.eos_token  # GPT2 does not have a pad token
-        logger.info("Tokenizer initialized.")
+        logger.info("Tokenizer loaded.")
         
-        # Create Training and Validation Datasets
-        logger.info("Creating Training Dataset...")
-        train_dataset = MusicDataset(train_texts, tokenizer, max_length=128)
+        # Load the songs dataset
+        songs_path = "songs.json"  # Ensure that songs.json is in the same directory
+        logger.info(f"Loading songs data from '{songs_path}'...")
+        with open(songs_path, 'r', encoding='utf-8') as f:
+            songs = json.load(f)
+        songs_df_local = pd.DataFrame(songs)
         
-        logger.info("Creating Validation Dataset...")
-        val_dataset = MusicDataset(val_texts, tokenizer, max_length=128)
+        # Data Cleaning and Preparation
+        logger.info("Cleaning and preparing songs data...")
+        songs_df_local['description'] = songs_df_local.apply(
+            lambda row: f"{row['genre']} song by {row['artist_name']} from {row['country']}. Mood: {row.get('mood', 'neutral')}.",
+            axis=1
+        )
+        songs_df_local['target'] = songs_df_local.apply(
+            lambda row: f"{row['song_name']} by {row['artist_name']}",
+            axis=1
+        )
         
-        # Create DataLoaders
-        logger.info("Creating DataLoaders...")
-        train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=16, shuffle=True)
-        val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=16, shuffle=False)
-        logger.info("DataLoaders created.")
+        # Normalize text
+        songs_df_local['description'] = songs_df_local['description'].apply(clean_text)
+        songs_df_local['target'] = songs_df_local['target'].apply(clean_text)
         
-        # Initialize model
+        # Handle missing values
+        songs_df_local = songs_df_local.fillna({
+            'mood': 'neutral',
+            'genre': 'Unknown',
+            'artist_name': 'Unknown',
+            'song_name': 'Unknown'
+        })
+        
+        # Split data into training, validation, and testing sets (70% train, 20% val, 10% test)
+        logger.info("Splitting data into Train (70%), Validation (20%), and Test (10%) sets...")
+        train_df, temp_df = train_test_split(songs_df_local, test_size=0.3, random_state=42)
+        val_df, test_df = train_test_split(temp_df, test_size=1/3, random_state=42)  # 0.3 * (1/3) = 0.1
+        logger.info(f"Training samples: {len(train_df)}, Validation samples: {len(val_df)}, Test samples: {len(test_df)}")
+        
+        # Create datasets
+        train_dataset = SongDataset(
+            descriptions=train_df['description'].tolist(),
+            targets=train_df['target'].tolist(),
+            tokenizer=tokenizer,
+            max_length=128
+        )
+        
+        val_dataset = SongDataset(
+            descriptions=val_df['description'].tolist(),
+            targets=val_df['target'].tolist(),
+            tokenizer=tokenizer,
+            max_length=128
+        )
+
+        test_dataset = SongDataset(
+            descriptions=test_df['description'].tolist(),
+            targets=test_df['target'].tolist(),
+            tokenizer=tokenizer,
+            max_length=128
+        )
+        
+        # Create dataloaders
+        batch_size = 8
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=2,  # Reduced num_workers to 2
+            pin_memory=True
+        )  # Reduced num_workers to 2
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=batch_size,
+            num_workers=2,
+            pin_memory=True
+        )
+        test_loader = DataLoader(
+            test_dataset,
+            batch_size=batch_size,
+            num_workers=2,
+            pin_memory=True
+        )
+        
+        # Initialize the model
         logger.info("Initializing model...")
         model = MusicRecommendationModel(pretrained_model_name='gpt2', dropout=0.3)
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         model.to(device)
-        logger.info(f"Model initialized and moved to {device}.")
+        logger.info("Model initialized.")
         
         # Define optimizer and scheduler
-        logger.info("Defining optimizer and scheduler...")
-        optimizer = optim.AdamW(model.parameters(), lr=5e-5, weight_decay=0.01)
-        total_steps = len(train_dataloader) * 10  # epochs=10
+        optimizer = AdamW(model.parameters(), lr=3e-5, eps=1e-8)  # Changed to PyTorch's AdamW and reduced learning rate
+        epochs = 10
+        total_steps = len(train_loader) * epochs
         scheduler = get_linear_schedule_with_warmup(
             optimizer,
-            num_warmup_steps=int(0.1 * total_steps),
+            num_warmup_steps=0,
             num_training_steps=total_steps
         )
-        logger.info("Optimizer and scheduler defined.")
         
-        # Train the model
-        logger.info("Commencing training...")
-        train_model(model, train_dataloader, val_dataloader, optimizer, scheduler, device, epochs=10, patience=3)
-        
-        # Save the trained model
-        logger.info("Saving the trained model...")
-        torch.save(model.state_dict(), "trained_music_recommender.pt")
-        logger.info("Model saved as 'trained_music_recommender.pt'.")
-        
-        # Load the trained model for inference
-        logger.info("Loading the trained model for inference...")
-        model_load = MusicRecommendationModel(pretrained_model_name='gpt2', dropout=0.3)
-        model_load.load_state_dict(torch.load("trained_music_recommender.pt", map_location=device))
-        model_load.to(device)
-        model_load.eval()
-        logger.info("Model loaded and set to evaluation mode.")
-        
-        # Assign the loaded model to the global model variable used in the API
-        model = model_load
-        logger.info("Assigned loaded model to global 'model' variable.")
-        
-        # Apply nest_asyncio to handle asyncio issues in certain environments
-        try:
-            nest_asyncio.apply()
-            logger.info("Applied nest_asyncio to allow nested event loops.")
-        except Exception as e:
-            logger.warning(f"Could not apply nest_asyncio: {e}")
-        
-        # Run the FastAPI server
-        logger.info("Starting FastAPI server...")
-        try:
-            uvicorn.run(app, host="0.0.0.0", port=8000)
-        except RuntimeError as e:
-            if "asyncio.run() cannot be called from a running event loop" in str(e):
-                logger.warning("RuntimeError encountered: asyncio.run() cannot be called from a running event loop. Applying nest_asyncio and retrying...")
-                nest_asyncio.apply()
-                uvicorn.run(app, host="0.0.0.0", port=8000)
+        # Initialize mixed precision scaler
+        scaler = torch.amp.GradScaler()  # Changed to torch.amp.GradScaler()
+    
+        # Training loop with validation and checkpointing
+        best_val_loss = float('inf')
+        patience = 3
+        patience_counter = 0
+
+        for epoch in range(1, epochs + 1):
+            logger.info(f"Epoch {epoch}/{epochs}")
+            train_loss, train_perplexity = train_epoch(model, train_loader, optimizer, scheduler, device, epoch, scaler)
+            val_loss, val_perplexity = eval_model(model, val_loader, device, epoch, phase="Validation")
+            
+            # Check for improvement
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                patience_counter = 0
+                # Save the best model
+                torch.save(model.state_dict(), "best_trained_music_recommender.pt")
+                logger.info(f"Validation loss improved. Model checkpoint saved.")
             else:
-                raise e
-        
+                patience_counter += 1
+                logger.info(f"No improvement in validation loss for {patience_counter} epoch(s).")
+                if patience_counter >= patience:
+                    logger.info("Early stopping triggered.")
+                    break
+
+        logger.info("Training completed.")
+
+        # Evaluate on Test Set
+        logger.info("Evaluating model on Test Set...")
+        test_loss, test_perplexity = eval_model(model, test_loader, device, epoch, phase="Test")
+        logger.info(f"Test Loss: {test_loss:.4f}, Test Perplexity: {test_perplexity:.2f}")
+
+        # Start the FastAPI server after training
+        logger.info("Starting FastAPI server...")
+        # Run Uvicorn in a separate thread to prevent blocking in Colab
+        import threading
+
+        def run_server():
+            uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+
+        server_thread = threading.Thread(target=run_server, daemon=True)
+        server_thread.start()
+        logger.info("FastAPI server is running in the background.")
+
     except Exception as e:
-        logger.error(f"An error occurred while running the script: {e}")
+        logger.error(f"An error occurred in the training script: {e}")
+
+# ----------------------------- #
+#            Entry Point         #
+# ----------------------------- #
 
 if __name__ == "__main__":
     main()
