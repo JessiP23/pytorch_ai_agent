@@ -19,7 +19,9 @@ from typing import Optional
 import asyncio
 import warnings
 from fuzzywuzzy import process, fuzz  # Added imports for fuzzy matching
-from contextlib import asynccontextmanager  # Added for FastAPI lifespan
+
+# FastAPI lifespan management
+from contextlib import asynccontextmanager 
 from tqdm import tqdm  # Added import for progress bars
 
 # ----------------------------- #
@@ -195,7 +197,13 @@ class InferenceModel:
         self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         logger.info(f"Loading model from '{model_path}' to device '{self.device}'...")
         self.model = MusicRecommendationModel()
-        self.model.load_state_dict(torch.load(model_path, map_location=self.device))  # Set weights_only=True if applicable
+        
+        # Use weights_only=True if you're using PyTorch 2.0+
+        if hasattr(torch, 'load') and 'weights_only' in torch.load.__code__.co_varnames:
+            self.model.load_state_dict(torch.load(model_path, map_location=self.device, weights_only=True))
+        else:
+            self.model.load_state_dict(torch.load(model_path, map_location=self.device))
+        
         self.model.to(self.device)
         self.model.eval()
 
@@ -241,7 +249,7 @@ class InferenceModel:
             else:
                 logger.warning("Incomplete extraction; proceeding to fallback recommendation.")
                 return self.fallback_recommendation(songs_df)
-
+    
             # Fuzzy matching for song and artist
             song_matches = process.extract(
                 song_name,
@@ -285,7 +293,7 @@ class InferenceModel:
             "spotify_url": make_clickable(song.get('spotify_url', '')),
             "apple_url": make_clickable(song.get('apple_url', '')),
             "instagram_url": make_clickable(song.get('instagram_url', '')),
-            "perplexity": ""  # Perplexity can be calculated if needed
+            "perplexity": ""  # Placeholder; calculate if needed
         }
 
 # ----------------------------- #
@@ -318,28 +326,44 @@ songs_df = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global inference_model, songs_df
-    logger.info(f"Loading model from 'best_trained_music_recommender.pt'...")
-    model_path = "best_trained_music_recommender.pt"
-    tokenizer_path = "gpt2"
-    inference_model = InferenceModel(model_path, tokenizer_path)
-    
-    # Load the songs dataset
-    songs_path = "songs.json"
-    logger.info(f"Loading songs data from '{songs_path}' for inference...")
-    with open(songs_path, 'r', encoding='utf-8') as f:
-        songs = json.load(f)
-    songs_df = pd.DataFrame(songs)
-    # Clean song and artist names
-    songs_df['song_name_clean'] = songs_df['song_name'].apply(clean_text)
-    songs_df['artist_name_clean'] = songs_df['artist_name'].apply(clean_text)
-    logger.info(f"Loaded {len(songs_df)} songs for inference.")
-    
-    yield
-    
-    # Shutdown events (if any)
-    logger.info("Shutting down FastAPI server...")
+    try:
+        logger.info("Starting up FastAPI application...")
 
-app = FastAPI(title="Music Recommendation API", lifespan=lifespan)
+        # Paths to model and dataset
+        model_path = "best_trained_music_recommender.pt"
+        tokenizer_path = "gpt2"
+        songs_path = "songs.json"
+
+        # Load the tokenizer
+        logger.info(f"Loading tokenizer from '{tokenizer_path}'...")
+        tokenizer = GPT2Tokenizer.from_pretrained(tokenizer_path)
+        tokenizer.pad_token = tokenizer.eos_token
+        logger.info("Tokenizer loaded successfully.")
+
+        # Initialize and load the model
+        logger.info(f"Loading model from '{model_path}'...")
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        inference_model = InferenceModel(model_path=model_path, tokenizer_path=tokenizer_path, device=device)
+
+        # Load the songs dataset
+        logger.info(f"Loading songs data from '{songs_path}'...")
+        with open(songs_path, 'r', encoding='utf-8') as f:
+            songs = json.load(f)
+        songs_df = pd.DataFrame(songs)
+
+        # Clean song and artist names for matching
+        songs_df['song_name_clean'] = songs_df['song_name'].apply(clean_text)
+        songs_df['artist_name_clean'] = songs_df['artist_name'].apply(clean_text)
+        logger.info(f"Loaded {len(songs_df)} songs for inference.")
+
+        logger.info("FastAPI application startup complete.")
+
+        yield
+    except Exception as e:
+        logger.error(f"Error during startup: {e}")
+        sys.exit(1)
+    finally:
+        logger.info("Shutting down FastAPI server...")
 
 @app.post("/recommend", response_model=RecommendationResponse)
 def recommend_song(request: RecommendationRequest):
@@ -360,6 +384,7 @@ def recommend_song(request: RecommendationRequest):
         instagram_url=recommendation["instagram_url"],
         perplexity=recommendation.get("perplexity")
     )
+
 
 # ----------------------------- #
 #            Main Function       #
