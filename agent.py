@@ -1,8 +1,17 @@
+# standard libraries
 # stream handling
 import sys 
-
 #JSON handling
 import json
+# regular expressions
+import re
+# math functions
+import math
+# asynchroneous context manager
+import os
+import asyncio
+
+
 import torch
 import torch.nn as nn
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
@@ -13,19 +22,13 @@ import logging
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
 
-# regular expressions
-import re
-
-# math functions
-import math
-
 # asynchroneous context manager
 import os
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uvicorn
 from typing import Optional
-import asyncio
+
 import warnings
 from fuzzywuzzy import process, fuzz  # Added imports for fuzzy matching
 
