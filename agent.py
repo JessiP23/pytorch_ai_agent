@@ -33,9 +33,11 @@ from torch.utils.data import Dataset, DataLoader
 # log warnings and errors
 import logging
 
-
+# API building for trained model
 from fastapi import FastAPI, HTTPException
+# Serialization and data validation
 from pydantic import BaseModel
+# ASGI server to run FastAPI app
 import uvicorn
 from typing import Optional
 
