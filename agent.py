@@ -33,8 +33,7 @@ from torch.utils.data import Dataset, DataLoader
 # log warnings and errors
 import logging
 
-# asynchroneous context manager
-import os
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uvicorn
