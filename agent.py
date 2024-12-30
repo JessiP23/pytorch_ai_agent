@@ -22,11 +22,13 @@ from torch.optim import AdamW
 # improve convergence and reduce training time
 from transformers import get_linear_schedule_with_warmup
 
+# data handling
 import pandas as pd
-import logging
+# split data into training and testing sets
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
 
+import logging
 # asynchroneous context manager
 import os
 from fastapi import FastAPI, HTTPException
