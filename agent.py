@@ -515,7 +515,7 @@ def main():
 
         # Start the FastAPI server after training
         logger.info("Starting FastAPI server...")
-        # Run Uvicorn in a separate thread to prevent blocking in Colab
+
         import threading
 
         def run_server():
