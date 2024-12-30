@@ -1,7 +1,3 @@
-# ----------------------------- #
-#          Imports               #
-# ----------------------------- #
-
 import sys  # Added import for stream handling
 import json
 import torch
