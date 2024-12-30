@@ -11,12 +11,17 @@ import math
 import os
 import asyncio
 
-
+# PyTorch and transformers
+# build and train neural networks
 import torch
 import torch.nn as nn
+# language generation tasks
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
-from torch.optim import AdamW  # Changed import to PyTorch's AdamW
+# optimizer (weight decary and learning rate scheduling)    
+from torch.optim import AdamW  
+# improve convergence and reduce training time
 from transformers import get_linear_schedule_with_warmup
+
 import pandas as pd
 import logging
 from sklearn.model_selection import train_test_split
