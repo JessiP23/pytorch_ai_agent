@@ -22,7 +22,9 @@ from fuzzywuzzy import process, fuzz  # Added imports for fuzzy matching
 
 # FastAPI lifespan management
 from contextlib import asynccontextmanager 
-from tqdm import tqdm  # Added import for progress bars
+
+# progress bars
+from tqdm import tqdm
 
 # ----------------------------- #
 #       Configuration Setup      #
