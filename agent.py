@@ -221,6 +221,7 @@ def train_epoch(model, data_loader, optimizer, scheduler, device, epoch, scaler)
         with torch.amp.autocast(device_type='cuda'):
             loss, _ = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
         
+        # backward pass
         scaler.scale(loss).backward()
 
         # Gradient clipping
