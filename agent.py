@@ -75,8 +75,11 @@ logger = logging.getLogger(__name__)
 # normalize and clean text
 def clean_text(text):
     """Normalize and clean text for consistency."""
+    
+    # handling cases where text is not a string
     if not isinstance(text, str):
         text = str(text)
+        
     # Remove text within parentheses and brackets
     text = re.sub(r'\(.*?\)|\[.*?\]', '', text)
     return re.sub(r'[^\w\s]', '', text).strip().lower()
