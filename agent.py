@@ -108,6 +108,8 @@ def make_clickable(url):
 
 # inheritances from Dataset class
 class SongDataset(Dataset):
+    
+    # constructor method
     def __init__(self, descriptions, targets, tokenizer, max_length=128):
         self.descriptions = descriptions
         self.targets = targets
