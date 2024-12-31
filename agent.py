@@ -91,6 +91,8 @@ def calculate_perplexity(loss):
     """Calculate perplexity from loss."""
     try:
         return math.exp(loss)
+    
+    # if the loss is too large, return infinity
     except OverflowError:
         logger.error("Overflow error encountered while calculating perplexity.")
         return float('inf')
