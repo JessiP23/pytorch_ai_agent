@@ -141,6 +141,7 @@ class SongDataset(Dataset):
         )
 
         # Encode target
+        # Prepare the model input
         target_encoding = self.tokenizer.encode_plus(
             target,
             add_special_tokens=True,
