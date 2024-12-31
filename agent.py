@@ -214,6 +214,7 @@ def train_epoch(model, data_loader, optimizer, scheduler, device, epoch, scaler)
         attention_mask = batch["attention_mask"].to(device)
         labels = batch["labels"].to(device)
 
+        # Reset gradients to zero to prevent accumulation
         optimizer.zero_grad()
         
         with torch.amp.autocast(device_type='cuda'):
