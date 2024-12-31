@@ -199,6 +199,8 @@ class MusicRecommendationModel(nn.Module):
 # scheduler: adjust the learning rate during training
 # scaler: mixed-precision training with AMP
 def train_epoch(model, data_loader, optimizer, scheduler, device, epoch, scaler):
+    
+    # dropout and batch normalization layers behave differently during training
     model.train()
     total_loss = 0
     progress_bar = tqdm(data_loader, desc=f"Training Epoch {epoch}", leave=True)
