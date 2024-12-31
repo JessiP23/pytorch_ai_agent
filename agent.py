@@ -72,6 +72,7 @@ logger = logging.getLogger(__name__)
 #        Utility Functions       #
 # ----------------------------- #
 
+# clean text
 def clean_text(text):
     """Normalize and clean text for consistency."""
     if not isinstance(text, str):
