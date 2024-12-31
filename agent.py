@@ -124,6 +124,7 @@ class SongDataset(Dataset):
 
     # return the item at the given index
     def __getitem__(self, idx):
+        # match idx to string
         description = str(self.descriptions[idx])
         target = str(self.targets[idx])
 
