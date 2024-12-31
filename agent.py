@@ -235,6 +235,8 @@ def train_epoch(model, data_loader, optimizer, scheduler, device, epoch, scaler)
         scaler.update()
         scheduler.step()
 
+
+        # 3000
         total_loss += loss.item()
         progress_bar.set_postfix({"Loss": f"{loss.item():.4f}"})
 
