@@ -203,6 +203,8 @@ def train_epoch(model, data_loader, optimizer, scheduler, device, epoch, scaler)
     # dropout and batch normalization layers behave differently during training
     model.train()
     total_loss = 0
+    
+    # progress bar for the current epoch
     progress_bar = tqdm(data_loader, desc=f"Training Epoch {epoch}", leave=True)
     for batch in progress_bar:
         input_ids = batch["input_ids"].to(device)
