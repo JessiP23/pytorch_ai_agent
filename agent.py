@@ -206,6 +206,8 @@ def train_epoch(model, data_loader, optimizer, scheduler, device, epoch, scaler)
     
     # progress bar for the current epoch
     progress_bar = tqdm(data_loader, desc=f"Training Epoch {epoch}", leave=True)
+    
+    # Batch procesing
     for batch in progress_bar:
         input_ids = batch["input_ids"].to(device)
         attention_mask = batch["attention_mask"].to(device)
