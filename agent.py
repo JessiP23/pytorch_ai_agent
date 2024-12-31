@@ -209,6 +209,7 @@ def train_epoch(model, data_loader, optimizer, scheduler, device, epoch, scaler)
     
     # Batch procesing
     for batch in progress_bar:
+        # move input_ids, attention_mask, and labels to device
         input_ids = batch["input_ids"].to(device)
         attention_mask = batch["attention_mask"].to(device)
         labels = batch["labels"].to(device)
