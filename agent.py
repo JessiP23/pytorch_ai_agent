@@ -113,6 +113,7 @@ class SongDataset(Dataset):
     def __init__(self, descriptions, targets, tokenizer, max_length=128):
         self.descriptions = descriptions
         self.targets = targets
+        # convert text into token IDs
         self.tokenizer = tokenizer
         self.max_length = max_length
 
