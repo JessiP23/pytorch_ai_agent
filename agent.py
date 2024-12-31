@@ -183,6 +183,8 @@ class MusicRecommendationModel(nn.Module):
             attention_mask=attention_mask,
             labels=labels
         )
+        
+        # output.logits is the raw and unnormilized prediction values for each token
         return outputs.loss, outputs.logits
 
 # ----------------------------- #
