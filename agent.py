@@ -170,6 +170,7 @@ class MusicRecommendationModel(nn.Module):
     def __init__(self, pretrained_model_name='gpt2', dropout=0.3):
         super(MusicRecommendationModel, self).__init__()
         self.model = GPT2LMHeadModel.from_pretrained(pretrained_model_name)
+        # dropout layer of 0.3
         self.dropout = nn.Dropout(dropout)
         # Fixed the error: Removed len() since vocab_size is already an integer
         self.model.resize_token_embeddings(self.model.config.vocab_size)
