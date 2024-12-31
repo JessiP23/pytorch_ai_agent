@@ -85,6 +85,8 @@ def clean_text(text):
     text = re.sub(r'\(.*?\)|\[.*?\]', '', text)
     return re.sub(r'[^\w\s]', '', text).strip().lower()
 
+
+# calculate perplexity based on the loss value
 def calculate_perplexity(loss):
     """Calculate perplexity from loss."""
     try:
