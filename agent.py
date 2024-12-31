@@ -176,6 +176,7 @@ class MusicRecommendationModel(nn.Module):
         # Fixed the error: Removed len() since vocab_size is already an integer
         self.model.resize_token_embeddings(self.model.config.vocab_size)
     
+    # compute the output of the model given the input
     def forward(self, input_ids, attention_mask, labels=None):
         outputs = self.model(
             input_ids=input_ids,
