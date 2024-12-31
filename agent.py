@@ -164,6 +164,7 @@ class SongDataset(Dataset):
 
 
 # Neural Network Class
+# GPT2LMHeadModel
 class MusicRecommendationModel(nn.Module):
     def __init__(self, pretrained_model_name='gpt2', dropout=0.3):
         super(MusicRecommendationModel, self).__init__()
