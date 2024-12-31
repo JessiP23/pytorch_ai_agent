@@ -117,6 +117,8 @@ class SongDataset(Dataset):
         self.tokenizer = tokenizer
         self.max_length = max_length
 
+
+    # return the length of the dataset
     def __len__(self):
         return len(self.descriptions)
 
