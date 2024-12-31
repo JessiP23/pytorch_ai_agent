@@ -122,6 +122,7 @@ class SongDataset(Dataset):
     def __len__(self):
         return len(self.descriptions)
 
+    # return the item at the given index
     def __getitem__(self, idx):
         description = str(self.descriptions[idx])
         target = str(self.targets[idx])
