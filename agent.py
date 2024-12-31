@@ -99,6 +99,7 @@ def calculate_perplexity(loss):
 
 def make_clickable(url):
     """Format URLs as clickable links."""
+    # clikcable link
     return f"<{url}>" if url else ""
 
 # ----------------------------- #
