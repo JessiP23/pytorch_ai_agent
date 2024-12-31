@@ -191,6 +191,7 @@ class MusicRecommendationModel(nn.Module):
 #          Training Function     #
 # ----------------------------- #
 
+# epoch: one complete pass through the dataset
 def train_epoch(model, data_loader, optimizer, scheduler, device, epoch, scaler):
     model.train()
     total_loss = 0
