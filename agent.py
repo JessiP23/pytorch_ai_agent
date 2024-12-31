@@ -217,6 +217,7 @@ def train_epoch(model, data_loader, optimizer, scheduler, device, epoch, scaler)
         # Reset gradients to zero to prevent accumulation
         optimizer.zero_grad()
         
+        # Forward pass with mixed precision
         with torch.amp.autocast(device_type='cuda'):
             loss, _ = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
         
