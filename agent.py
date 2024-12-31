@@ -136,6 +136,7 @@ class SongDataset(Dataset):
             padding='max_length',
             truncation=True,
             return_attention_mask=True,
+            # return output as PyTorch tensors
             return_tensors='pt',
         )
 
