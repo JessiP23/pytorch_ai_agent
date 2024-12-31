@@ -81,6 +81,7 @@ def clean_text(text):
         text = str(text)
         
     # Remove text within parentheses and brackets
+    # Regex pattern: \(.*?\) OR \[.*?\]
     text = re.sub(r'\(.*?\)|\[.*?\]', '', text)
     return re.sub(r'[^\w\s]', '', text).strip().lower()
 
