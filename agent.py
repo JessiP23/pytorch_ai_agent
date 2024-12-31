@@ -229,6 +229,8 @@ def train_epoch(model, data_loader, optimizer, scheduler, device, epoch, scaler)
         # clip gradients to a maximum norm of 1.0 to stabilizer training and prevent exploding the gradients
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 
+        
+        # parameter update
         scaler.step(optimizer)
         scaler.update()
         scheduler.step()
