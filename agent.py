@@ -197,6 +197,7 @@ class MusicRecommendationModel(nn.Module):
 # data_loader: Pytorch DataLoader for the training dataset
 # optimizer: update the model's parameters based on the loss
 # scheduler: adjust the learning rate during training
+# scaler: mixed-precision training with AMP
 def train_epoch(model, data_loader, optimizer, scheduler, device, epoch, scaler):
     model.train()
     total_loss = 0
