@@ -171,6 +171,7 @@ class MusicRecommendationModel(nn.Module):
         super(MusicRecommendationModel, self).__init__()
         self.model = GPT2LMHeadModel.from_pretrained(pretrained_model_name)
         # dropout layer of 0.3
+        # fraction of the neuron output to 0 during training
         self.dropout = nn.Dropout(dropout)
         # Fixed the error: Removed len() since vocab_size is already an integer
         self.model.resize_token_embeddings(self.model.config.vocab_size)
