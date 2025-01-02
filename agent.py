@@ -258,6 +258,7 @@ def eval_model(model, data_loader, device, epoch, phase="Validation"):
     model.eval()
     # initialize total loss to 0
     total_loss = 0
+    # progress bar for the current epoch
     progress_bar = tqdm(data_loader, desc=f"{phase} Epoch {epoch}", leave=True)
     with torch.no_grad():
         for batch in progress_bar:
