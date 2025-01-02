@@ -254,6 +254,7 @@ def train_epoch(model, data_loader, optimizer, scheduler, device, epoch, scaler)
 
 # model: neural network to be evaluated
 def eval_model(model, data_loader, device, epoch, phase="Validation"):
+    # dropout and batch normalization layers behave differently during evaluation
     model.eval()
     total_loss = 0
     progress_bar = tqdm(data_loader, desc=f"{phase} Epoch {epoch}", leave=True)
