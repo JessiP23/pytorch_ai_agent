@@ -256,6 +256,7 @@ def train_epoch(model, data_loader, optimizer, scheduler, device, epoch, scaler)
 def eval_model(model, data_loader, device, epoch, phase="Validation"):
     # dropout and batch normalization layers behave differently during evaluation
     model.eval()
+    # initialize total loss to 0
     total_loss = 0
     progress_bar = tqdm(data_loader, desc=f"{phase} Epoch {epoch}", leave=True)
     with torch.no_grad():
