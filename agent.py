@@ -240,6 +240,7 @@ def train_epoch(model, data_loader, optimizer, scheduler, device, epoch, scaler)
         # 3000
         # total loss for the epoch
         total_loss += loss.item()
+        # update the progress bar
         progress_bar.set_postfix({"Loss": f"{loss.item():.4f}"})
 
     avg_loss = total_loss / len(data_loader)
