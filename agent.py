@@ -39,6 +39,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 # ASGI server to run FastAPI app
 import uvicorn
+import time
 from typing import Optional
 
 import warnings
@@ -237,6 +238,7 @@ def train_epoch(model, data_loader, optimizer, scheduler, device, epoch, scaler)
 
 
         # 3000
+        # total loss for the epoch
         total_loss += loss.item()
         progress_bar.set_postfix({"Loss": f"{loss.item():.4f}"})
 
@@ -623,6 +625,14 @@ def main():
         server_thread = threading.Thread(target=run_server, daemon=True)
         server_thread.start()
         logger.info("FastAPI server is running in the background.")
+        
+        # Wait for the server to start
+        time.sleep(2)
+        
+        print("FastAPI server is accessible at http://127.0.0.1:8000/docs")
+        
+        while True:
+            time.sleep(1)
 
     except Exception as e:
         logger.error(f"An error occurred in the training script: {e}")
