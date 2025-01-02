@@ -243,6 +243,7 @@ def train_epoch(model, data_loader, optimizer, scheduler, device, epoch, scaler)
         # update the progress bar
         progress_bar.set_postfix({"Loss": f"{loss.item():.4f}"})
 
+    # average loss for the epoch
     avg_loss = total_loss / len(data_loader)
     perplexity = calculate_perplexity(avg_loss)
     logger.info(f"Epoch {epoch}: Training Loss: {avg_loss:.4f}, Perplexity: {perplexity:.2f}")
