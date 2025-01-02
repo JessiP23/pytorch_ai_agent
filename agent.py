@@ -245,6 +245,7 @@ def train_epoch(model, data_loader, optimizer, scheduler, device, epoch, scaler)
 
     # average loss for the epoch
     avg_loss = total_loss / len(data_loader)
+    # calculate perplexity
     perplexity = calculate_perplexity(avg_loss)
     logger.info(f"Epoch {epoch}: Training Loss: {avg_loss:.4f}, Perplexity: {perplexity:.2f}")
     return avg_loss, perplexity
