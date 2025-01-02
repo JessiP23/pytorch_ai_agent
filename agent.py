@@ -252,6 +252,7 @@ def train_epoch(model, data_loader, optimizer, scheduler, device, epoch, scaler)
     # return the average loss and perplexity
     return avg_loss, perplexity
 
+# model: neural network to be evaluated
 def eval_model(model, data_loader, device, epoch, phase="Validation"):
     model.eval()
     total_loss = 0
