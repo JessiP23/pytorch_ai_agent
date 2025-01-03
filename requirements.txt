@@ -1,0 +1,13 @@
+streamlit
+torch
+transformers
+pandas
+fuzzywuzzy  
+python-Levenshtein
+transformers
+pandas
+sklearn
+fastapi
+uvicorn
+fuzzywuzzy
+tqdm
