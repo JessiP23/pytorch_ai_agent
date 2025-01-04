@@ -320,6 +320,7 @@ class InferenceModel:
                     input_ids=inputs['input_ids'],
                     attention_mask=inputs['attention_mask'],
                     max_new_tokens=80,
+                    num_beams=5,
                     num_return_sequences=1,
                     no_repeat_ngram_size=2,
                     early_stopping=True,
