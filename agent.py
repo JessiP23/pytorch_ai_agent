@@ -150,6 +150,7 @@ class SongDataset(Dataset):
             max_length=self.max_length,
             padding='max_length',
             truncation=True,
+            # attention mask to true
             return_attention_mask=True,
             return_tensors='pt',
         )
