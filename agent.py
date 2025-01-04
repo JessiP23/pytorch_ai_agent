@@ -319,13 +319,18 @@ class InferenceModel:
                 outputs = self.model.model.generate(
                     input_ids=inputs['input_ids'],
                     attention_mask=inputs['attention_mask'],
-                    max_length=50,
+                    max_new_tokens=80,
                     num_return_sequences=1,
                     no_repeat_ngram_size=2,
-                    early_stopping=True
+                    early_stopping=True,
+                    do_sample=True,
+                    # random sampling
+                    temperature=0.7,
+                    # nucleus sampling
+                    top_p=0.9
                 )
 
-            predicted_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+            predicted_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True, clean_up_tokenization_spaces=True)
             logger.info(f"Model generated text: '{predicted_text}'")
 
             # Extract song name and artist
