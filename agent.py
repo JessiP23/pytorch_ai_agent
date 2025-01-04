@@ -145,6 +145,7 @@ class SongDataset(Dataset):
         # Prepare the model input
         target_encoding = self.tokenizer.encode_plus(
             target,
+            # Add special tokens to the start and end of the input
             add_special_tokens=True,
             max_length=self.max_length,
             padding='max_length',
