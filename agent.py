@@ -278,6 +278,7 @@ def eval_model(model, data_loader, device, epoch, phase="Validation"):
             # update the progress bar
             progress_bar.set_postfix({"Loss": f"{loss.item():.4f}"})
 
+    # average loss for the epoch
     avg_loss = total_loss / len(data_loader)
     perplexity = calculate_perplexity(avg_loss)
     logger.info(f"Epoch {epoch}: {phase} Loss: {avg_loss:.4f}, Perplexity: {perplexity:.2f}")
