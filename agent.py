@@ -270,6 +270,7 @@ def eval_model(model, data_loader, device, epoch, phase="Validation"):
             attention_mask = batch["attention_mask"].to(device)
             labels = batch["labels"].to(device)
 
+            # Forward pass
             with torch.amp.autocast(device_type='cuda'):
                 loss, _ = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
             total_loss += loss.item()
