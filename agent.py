@@ -275,6 +275,7 @@ def eval_model(model, data_loader, device, epoch, phase="Validation"):
                 # calculate the loss
                 loss, _ = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
             total_loss += loss.item()
+            # update the progress bar
             progress_bar.set_postfix({"Loss": f"{loss.item():.4f}"})
 
     avg_loss = total_loss / len(data_loader)
