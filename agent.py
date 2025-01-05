@@ -272,6 +272,7 @@ def eval_model(model, data_loader, device, epoch, phase="Validation"):
 
             # Forward pass
             with torch.amp.autocast(device_type='cuda'):
+                # calculate the loss
                 loss, _ = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
             total_loss += loss.item()
             progress_bar.set_postfix({"Loss": f"{loss.item():.4f}"})
