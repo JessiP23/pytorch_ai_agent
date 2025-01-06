@@ -435,6 +435,8 @@ songs_df = None
 # Ensure that the model and dataset are loaded before starting the FastAPI server
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    
+    # Global variables
     global inference_model, songs_df
     try:
         logger.info("Starting up FastAPI application...")
