@@ -459,6 +459,8 @@ async def lifespan(app: FastAPI):
 
         # Initialize and load the model
         logger.info(f"Loading model from '{model_path}'...")
+        
+        # Device configuration
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         inference_model = InferenceModel(model_path=model_path, tokenizer_path=tokenizer_path, device=device)
 
