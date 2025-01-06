@@ -3,9 +3,6 @@ torch
 transformers
 pandas
 fuzzywuzzy  
-transformers
-pandas
-sklearn
 fastapi
 uvicorn
 fuzzywuzzy
