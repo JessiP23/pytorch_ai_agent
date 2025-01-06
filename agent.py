@@ -465,7 +465,6 @@ async def lifespan(app: FastAPI):
         # Load the inference model
         inference_model = InferenceModel(model_path=model_path, tokenizer_path=tokenizer_path, device=device)
 
-        # Load the songs dataset
         logger.info(f"Loading songs data from '{songs_path}'...")
         with open(songs_path, 'r', encoding='utf-8') as f:
             songs = json.load(f)
