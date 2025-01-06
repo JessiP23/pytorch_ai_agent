@@ -426,6 +426,8 @@ class RecommendationResponse(BaseModel):
 
 # Initialize Inference Model
 inference_model = None
+
+# Load Songs Dataset
 songs_df = None
 
 @asynccontextmanager
