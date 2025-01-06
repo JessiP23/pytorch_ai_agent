@@ -407,6 +407,7 @@ app = FastAPI(title="Music Recommendation API")
 class RecommendationRequest(BaseModel):
     description: str
 
+# Class for Recommendation Response
 class RecommendationResponse(BaseModel):
     description: str
     recommended_song: str
