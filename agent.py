@@ -439,6 +439,8 @@ async def lifespan(app: FastAPI):
     # Global variables
     global inference_model, songs_df
     try:
+        
+        # Load the model and dataset
         logger.info("Starting up FastAPI application...")
 
         # Paths to model and dataset
