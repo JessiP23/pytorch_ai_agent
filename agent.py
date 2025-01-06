@@ -404,6 +404,8 @@ class InferenceModel:
 
 app = FastAPI(title="Music Recommendation API")
 
+
+# Class for Recommendation Request
 class RecommendationRequest(BaseModel):
     description: str
 
