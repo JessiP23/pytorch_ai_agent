@@ -462,6 +462,7 @@ async def lifespan(app: FastAPI):
         
         # Device configuration
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # Load the inference model
         inference_model = InferenceModel(model_path=model_path, tokenizer_path=tokenizer_path, device=device)
 
         # Load the songs dataset
