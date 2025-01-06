@@ -450,6 +450,9 @@ async def lifespan(app: FastAPI):
 
         # Load the tokenizer
         logger.info(f"Loading tokenizer from '{tokenizer_path}'...")
+        
+        
+        # GPT2Tokenizer
         tokenizer = GPT2Tokenizer.from_pretrained(tokenizer_path)
         tokenizer.pad_token = tokenizer.eos_token
         logger.info("Tokenizer loaded successfully.")
