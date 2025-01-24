@@ -16,6 +16,8 @@ def load_model():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     return InferenceModel(model_path=model_path, tokenizer_path=tokenizer_path, device=device)
 
+    # INFERENCE MODEL
+
 # Load the songs dataset
 @st.cache_data
 def load_songs_data():
@@ -63,4 +65,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
